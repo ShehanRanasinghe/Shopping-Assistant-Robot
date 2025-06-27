@@ -32,5 +32,8 @@ The robot supports additional controls:
 <h2>📂 Contents</h2>
 <ul>
 <li>Arduino Source Code (.ino)</li>
+<li>Required Arduino libraries for Shopping Assistant Robot (.ino)</li>
+<li>Standalone testing code for each hardware component
+</li>
 </ul>
 
