@@ -1,18 +1,26 @@
-#include <AFMotor.h> //L293D Motor Driver Library
 #include <Wire.h>    //I2C Module
 #include <LiquidCrystal_I2C.h>//I2C Module with 16x2 LCD Library
 #include <Keypad.h>  //Keypad Library
+#include <SoftwareSerial.h>
 #include "GM65_scanner.h" // GM65 barcode scanner custom library from github
+SoftwareSerial mySerial(10, 11); // RX, TX
+
+GM65_scanner scanner(&mySerial);
 
 LiquidCrystal_I2C lcd(0x27, 16, 2); //I2C address 0x27
 
-#define left A0 //IR Sensor 01
-#define right A1 //IR Sensor 02 
+#define IR_LEFT   A13 //IR Sensor Right (Grey)
+#define IR_CENTER A14 //IR Sensor Center (Orange)
+#define IR_RIGHT  A15 //IR Sensor Left  (Black)
 
-AF_DCMotor motor1(1, MOTOR12_1KHZ); // Motor 1 connected to M1 (first driver chip - MOTOR12), 1 kHz PWM
-AF_DCMotor motor2(2, MOTOR12_1KHZ); // Motor 2 connected to M2 (first driver chip - MOTOR12), 1 kHz PWM
-AF_DCMotor motor3(3, MOTOR34_1KHZ); // Motor 3 connected to M3 (second driver chip - MOTOR34), 1 kHz PWM
-AF_DCMotor motor4(4, MOTOR34_1KHZ); // Motor 4 connected to M4 (second driver chip - MOTOR34), 1 kHz PWM
+//L298N Motor Control Pins
+#define ENA 4   // PWM speed control (left motor)
+#define IN1 5   // Left motor forward
+#define IN2 6   // Left motor backward
+#define IN3 7   // Right motor forward
+#define IN4 8   // Right motor backward
+#define ENB 9   // PWM speed control (right motor)
+int motorSpeed = 100; //Motor Speed
 
 //Dimensions of the 4X4 KeyPad
 const byte ROWS = 4;   
@@ -27,8 +35,8 @@ char keys[ROWS][COLS] = {
 };
 
 //Physical pin connections of the KeyPad.
-byte rowPins[ROWS] = {44, 42, 40, 38};
-byte colPins[COLS] = {36, 34, 32, 30};
+byte rowPins[ROWS] = {30, 32, 34, 36};
+byte colPins[COLS] = {38, 40, 42, 44};
 
 //Creates the KeyPad object for input reading
 Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
@@ -45,9 +53,6 @@ String itemBarcodes[8] = {
   "7024189365"  // 7 → Raffaello
 };
 
-// Barcode scanner object using Arduino Mega Serial1 (18 and 19 pins)
-GM65_scanner scanner(&Serial1);
-
 //Global Variables
 int selectedItem = 0;       // Holds the item numbers 1 to 7
 String correctCode = "";    // To matche the selected item using barcode
@@ -55,29 +60,39 @@ String scannedCode = "";    // Store the scanned barcodes from GM65
 bool isAuthorized = false;  // Until item is selected the system Starts False
 bool itemFound = false;     // When item is found the condition is set to True
 
-void setup() 
-{
-  //IR Sensors
-  pinMode(left, INPUT);              
-  pinMode(right, INPUT);             
+void setup() {
+  // IR Sensors
+  pinMode(IR_LEFT, INPUT);
+  pinMode(IR_CENTER, INPUT);
+  pinMode(IR_RIGHT, INPUT);
+
+  // Motor Pins
+  pinMode(IN1, OUTPUT);
+  pinMode(IN2, OUTPUT);
+  pinMode(IN3, OUTPUT);
+  pinMode(IN4, OUTPUT);
+  pinMode(ENA, OUTPUT);
+  pinMode(ENB, OUTPUT);
 
   // Begin communication with GM65 barcode scanner
-  Serial1.begin(9600);     
+  mySerial.begin(9600);
 
   lcd.init();      // Initialize LCD
   lcd.backlight(); // Turn on LCD backlight
   lcd.setCursor(0, 0);
   lcd.print("Select Item 1-7");
 
-  scanner.init();                // Initialize the GM65 scanner
-  scanner.enable_setting_code(); // Allow GM65 to read barcodes
+  scanner.init();
+  scanner.enable_setting_code();
+
 }
 
 void loop() {
-  char key = keypad.getKey(); //Get the current pressed key
+    char key = keypad.getKey(); //Get the current pressed key
 
   //Item Selection 1 to 7
-  if (!isAuthorized && key >= '1' && key <= '7') {
+  if (!isAuthorized && key >= '1' && key <= '7') 
+  {
     selectedItem = key - '0';                 // Convert char to int
     correctCode = itemBarcodes[selectedItem]; // Get matching barcode from Array
 
@@ -105,16 +120,7 @@ void loop() {
     lcd.print("Select Item 1-7"); // Show message again for selecting the items
   }
 
-  //When Press C in keypad the robot stop like a emergency stop
-  if (key == 'C') 
-  {
-    StopMotors();                        
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Stopped");             
-  }
-
-  //If authorized and item not found, follow the line and scanning
+   //If authorized and item not found, follow the line and scanning
   if (isAuthorized && !itemFound) 
   {
     LineFollowing();                     
@@ -137,58 +143,79 @@ void loop() {
       }
     }
   }
+
+
 }
 
-
-void LineFollowing() 
+void LineFollowing()
 {
-  if (digitalRead(left) == 0 && digitalRead(right) == 0) 
-  {
-    MoveForward();
-  } 
-  else if (digitalRead(left) == 0 && digitalRead(right) == 1) 
-  {
-    TurnRight();
-  } 
-  else if (digitalRead(left) == 1 && digitalRead(right) == 0) 
-  {
+  int left = digitalRead(IR_LEFT);
+  int center = digitalRead(IR_CENTER);
+  int right = digitalRead(IR_RIGHT);
+
+  if (center == 1 && left == 0 && right == 0) {
+    MoveForward();  // Line is centered
+  }
+  else if (left == 0 && center == 1 && right == 1) {
+    TurnLeft();     // Line detected on left only
+  }
+  else if (right == 0 && center == 1 && left == 1) {
+    TurnRight();    // Line detected on right only
+  }
+  else if (center == 0 && left == 0 && right == 1) {
+    // Line slightly left, adjust left
     TurnLeft();
-  } 
-  else 
-  {
-    StopMotors();
+  }
+  else if (center == 0 && right == 0 && left == 1) {
+    // Line slightly right, adjust right
+    TurnRight();
+  }
+  else if (center == 0 && left == 0 && right == 0) {
+    StopMotors();   // All sensors on white — Stop
+  }
+  else if (center == 1 && left == 1 && right == 1) {
+    StopMotors();   // All sensors on Black — Stop
+  }
+  else{
+    StopMotors(); //Stop
   }
 }
 
-// Motors
-void MoveForward() 
-{
-  motor1.run(FORWARD); motor1.setSpeed(80);
-  motor2.run(FORWARD); motor2.setSpeed(80);
-  motor3.run(FORWARD); motor3.setSpeed(80);
-  motor4.run(FORWARD); motor4.setSpeed(80);
+//Movements
+
+void MoveForward() {
+  digitalWrite(IN1, HIGH);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, HIGH);
+  digitalWrite(IN4, LOW);
+  analogWrite(ENA, motorSpeed);
+  analogWrite(ENB, motorSpeed);
 }
 
-void TurnRight() 
-{
-  motor1.run(FORWARD); motor1.setSpeed(80);
-  motor2.run(FORWARD); motor2.setSpeed(80);
-  motor3.run(BACKWARD); motor3.setSpeed(80);
-  motor4.run(BACKWARD); motor4.setSpeed(80);
+void TurnRight() {
+  digitalWrite(IN1, HIGH);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, HIGH);
+  analogWrite(ENA, motorSpeed);
+  analogWrite(ENB, motorSpeed);
 }
 
-void TurnLeft() 
-{
-  motor1.run(BACKWARD); motor1.setSpeed(80);
-  motor2.run(BACKWARD); motor2.setSpeed(80);
-  motor3.run(FORWARD); motor3.setSpeed(80);
-  motor4.run(FORWARD); motor4.setSpeed(80);
+void TurnLeft() {
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, HIGH);
+  digitalWrite(IN3, HIGH);
+  digitalWrite(IN4, LOW);
+  analogWrite(ENA, motorSpeed);
+  analogWrite(ENB, motorSpeed);
 }
 
-void StopMotors() 
-{
-  motor1.run(RELEASE); motor1.setSpeed(0);
-  motor2.run(RELEASE); motor2.setSpeed(0);
-  motor3.run(RELEASE); motor3.setSpeed(0);
-  motor4.run(RELEASE); motor4.setSpeed(0);
+void StopMotors() {
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, LOW);
+  analogWrite(ENA, 0);
+  analogWrite(ENB, 0);
 }
+

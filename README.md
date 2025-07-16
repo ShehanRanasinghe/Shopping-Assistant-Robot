@@ -4,7 +4,6 @@
 
 The robot supports additional controls:
 <ul>
-<li>Press C to stop the robot instantly</li>
 <li>Press D to reset and select a new item</li>
 </ul>
 
@@ -12,7 +11,7 @@ The robot supports additional controls:
 <ul>
 <li>Keypad-based item selection (1–7)</li>
 <li>Line-following navigation using IR sensors</li>
-<li>Barcode scanning with the GM65 module via Serial1</li>
+<li>Barcode scanning with the GM65 module via 10 & 11 pins</li>
 <li>LCD display for user feedback</li>
 <li>Manual stop and reset functions</li>
 <li>Tray platform for item pickup by user</li>
@@ -21,10 +20,10 @@ The robot supports additional controls:
 <h2>🔧 Hardware Used</h2>
 <ul>
 <li>Arduino Mega 2560</li>
-<li>L293D Motor Driver Shield</li>
+<li>L298N Motor Driver</li>
 <li>GM65 Barcode Scanner</li>
 <li>4x4 Matrix Keypad</li>
-<li>IR Sensors (x2)</li>
+<li>IR Sensors (x3)</li>
 <li>16x2 I2C LCD Display</li>
 <li>4 DC Motors + Robot Chassis</li>
 </ul>
