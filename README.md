@@ -26,6 +26,7 @@ The robot supports additional controls:
 <li>IR Sensors (x3)</li>
 <li>16x2 I2C LCD Display</li>
 <li>4 DC Motors + Robot Chassis</li>
+<li>QEBIDUM LM2596S DC-DC Buck Converter DIY 4-40V to 1.25-37V Step-Down Regulator Power Module Volt Stabilizer with LED Voltmeter Display</li>
 </ul>
 
 <h2>📂 Contents</h2>
