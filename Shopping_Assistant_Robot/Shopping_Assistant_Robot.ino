@@ -9,9 +9,11 @@ GM65_scanner scanner(&mySerial);
 
 LiquidCrystal_I2C lcd(0x27, 16, 2); //I2C address 0x27
 
-#define IR_LEFT   A13 //IR Sensor Right (Grey)
+#define IR_LEFT A13 //IR Sensor Right (Grey)
+#define IR_CL A12 //IR Sensor Between Center & Left (Orange)
 #define IR_CENTER A14 //IR Sensor Center (Orange)
-#define IR_RIGHT  A15 //IR Sensor Left  (Black)
+#define IR_CR A11 //IR Sensor Between Center & Right (Blue)
+#define IR_RIGHT A15 //IR Sensor Left  (Black)
 
 //L298N Motor Control Pins
 #define ENA 4   // PWM speed control (left motor)
@@ -20,7 +22,7 @@ LiquidCrystal_I2C lcd(0x27, 16, 2); //I2C address 0x27
 #define IN3 7   // Right motor forward
 #define IN4 8   // Right motor backward
 #define ENB 9   // PWM speed control (right motor)
-int motorSpeed = 100; //Motor Speed
+int motorSpeed = 80; //Motor Speed
 
 //Dimensions of the 4X4 KeyPad
 const byte ROWS = 4;   
@@ -65,6 +67,8 @@ void setup() {
   pinMode(IR_LEFT, INPUT);
   pinMode(IR_CENTER, INPUT);
   pinMode(IR_RIGHT, INPUT);
+  pinMode(IR_CL, INPUT);
+  pinMode(IR_CR, INPUT);
 
   // Motor Pins
   pinMode(IN1, OUTPUT);
@@ -149,36 +153,65 @@ void loop() {
 
 void LineFollowing()
 {
-  int left = digitalRead(IR_LEFT);
-  int center = digitalRead(IR_CENTER);
-  int right = digitalRead(IR_RIGHT);
+    int L  = digitalRead(IR_LEFT);
+    int CL = digitalRead(IR_CL);
+    int C  = digitalRead(IR_CENTER);
+    int CR = digitalRead(IR_CR);
+    int R  = digitalRead(IR_RIGHT);
 
-  if (center == 1 && left == 0 && right == 0) {
-    MoveForward();  // Line is centered
-  }
-  else if (left == 0 && center == 1 && right == 1) {
-    TurnLeft();     // Line detected on left only
-  }
-  else if (right == 0 && center == 1 && left == 1) {
-    TurnRight();    // Line detected on right only
-  }
-  else if (center == 0 && left == 0 && right == 1) {
-    // Line slightly left, adjust left
-    TurnLeft();
-  }
-  else if (center == 0 && right == 0 && left == 1) {
-    // Line slightly right, adjust right
-    TurnRight();
-  }
-  else if (center == 0 && left == 0 && right == 0) {
-    StopMotors();   // All sensors on white — Stop
-  }
-  else if (center == 1 && left == 1 && right == 1) {
-    StopMotors();   // All sensors on Black — Stop
-  }
-  else{
-    StopMotors(); //Stop
-  }
+    if (C == 1 && CL == 0 && CR == 0) MoveForward();
+    else if (CL == 1 && C == 1) TurnLeft();
+    else if (CR == 1 && C == 1) TurnRight();
+    else if (L == 1 || (CL == 1 && C == 0 && CR == 0)) TurnLeft();
+    else if (R == 1 || (CR == 1 && C == 0 && CL == 0)) TurnRight();
+    else if (L == 1 && CL == 1 && C == 1 && CR == 1 && R == 1) StopMotors();
+    else if (L == 0 && CL == 0 && C == 0 && CR == 0 && R == 0) StopMotors();
+    else StopMotors();
+
+
+  // int left = digitalRead(IR_LEFT);
+  // int center = digitalRead(IR_CENTER);
+  // int right = digitalRead(IR_RIGHT);
+  // int cl = digitalRead(IR_CL);
+  // int cr = digitalRead(IR_CR);
+
+  // if (left == 0 && cl == 0  && center == 1 && cr == 0 && right == 0 ) {   //0 0 1 0 0
+  //   MoveForward();  // Line is centered
+  // }
+  // else if (left == 0 && cl == 0 && center == 1 && cr == 1 && right == 1 ) { //0 0 1 1 1
+  //   TurnLeft();     // Line detected on left only
+  // }
+  // else if (left == 1 && cl == 1 && center == 1 && cr == 0 && right == 0 ) { //1 1 1 0 0
+  //   TurnRight();    // Line detected on right only
+  // }
+  // else if (left == 0 && cl == 0 && center == 0 && cr == 1 && right == 1 ) { //0 0 0 1 1
+  //   // Line slightly left, adjust left
+  //   TurnLeft();
+  // }
+  // else if (left == 1 && cl == 1 && center == 0 && cr == 0 && right == 0 ) { //1 1 0 0 0
+  //   // Line slightly right, adjust right
+  //   TurnRight();
+  // }
+
+  // else if (left == 1 && cl == 0 && center == 0 && cr == 0 && right == 0 ) { //1 0 0 0 0 
+  //   TurnRight();
+  // }
+
+  // else if (left == 0 && cl == 0 && center == 0 && cr == 0 && right == 1 ) { //0 0 0 0 1 
+  //   TurnLeft();
+  // }
+
+  // else if (left == 0 && cl == 1 && center == 0 && cr == 0 && right == 0 ) { //0 1 0 0 0 
+  //   TurnRight();
+  // }
+
+  // else if (left == 0 && cl == 0 && center == 0 && cr == 1 && right == 0 ) { //0 0 0 1 0 
+  //   TurnLeft();
+  // }
+
+  // else if (left == 1 && cl == 1 && center == 1 && cr == 1 && right == 1 ) { //1 1 1 1 1
+  //   StopMotors();   // All sensors on Black — Stop
+  // }
 }
 
 //Movements
@@ -218,4 +251,3 @@ void StopMotors() {
   analogWrite(ENA, 0);
   analogWrite(ENB, 0);
 }
-
